@@ -9,8 +9,14 @@ dotenv.config();
 const prisma = new PrismaClient();
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
+
+// ===== ROUTE ROOT =====
+app.get('/', (req, res) => {
+    res.send('API is running...');
+});
 
 // Middleware autentikasi
 function auth(role) {
@@ -94,6 +100,6 @@ app.get('/balance', auth('consultant'), async (req, res) => {
     res.json({ balance: user.balance });
 });
 
+// ===== LISTEN PORT =====
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
-
