@@ -13,9 +13,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ===== ROUTE ROOT =====
+// ====== TEST ROUTE ROOT ======
 app.get('/', (req, res) => {
-    res.send('API is running...');
+    res.send('✅ API is running and connected to Railway!');
 });
 
 // Middleware autentikasi
@@ -43,7 +43,8 @@ app.post('/register', async (req, res) => {
             data: { name, email, password: hashed, role }
         });
         res.json(user);
-    } catch {
+    } catch (error) {
+        console.error("❌ Register error:", error);
         res.status(400).json({ error: "Email already exists" });
     }
 });
@@ -63,10 +64,15 @@ app.post('/login', async (req, res) => {
 
 // List konsultan
 app.get('/consultants', async (req, res) => {
-    const consultants = await prisma.consultant.findMany({
-        include: { user: { select: { name: true, email: true } } }
-    });
-    res.json(consultants);
+    try {
+        const consultants = await prisma.consultant.findMany({
+            include: { user: { select: { name: true, email: true } } }
+        });
+        res.json(consultants);
+    } catch (error) {
+        console.error("❌ Fetch consultants error:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
 });
 
 // Booking + komisi otomatis
@@ -75,31 +81,49 @@ app.post('/book', auth('client'), async (req, res) => {
     const adminFee = totalFee * 0.10;
     const consultantEarning = totalFee - adminFee;
 
-    const session = await prisma.session.create({
-        data: {
-            clientId: req.user.id,
-            consultantId,
-            totalFee,
-            adminFee,
-            consultantEarning,
-            status: 'completed'
-        }
-    });
+    try {
+        const session = await prisma.session.create({
+            data: {
+                clientId: req.user.id,
+                consultantId,
+                totalFee,
+                adminFee,
+                consultantEarning,
+                status: 'completed'
+            }
+        });
 
-    await prisma.user.update({
-        where: { id: consultantId },
-        data: { balance: { increment: consultantEarning } }
-    });
+        await prisma.user.update({
+            where: { id: consultantId },
+            data: { balance: { increment: consultantEarning } }
+        });
 
-    res.json(session);
+        res.json(session);
+    } catch (error) {
+        console.error("❌ Booking error:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
 });
 
 // Lihat saldo konsultan
 app.get('/balance', auth('consultant'), async (req, res) => {
-    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-    res.json({ balance: user.balance });
+    try {
+        const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+        res.json({ balance: user.balance });
+    } catch (error) {
+        console.error("❌ Fetch balance error:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
 });
 
 // ===== LISTEN PORT =====
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+app.listen(PORT, async () => {
+    try {
+        await prisma.$connect();
+        console.log(`✅ Database connected`);
+    } catch (error) {
+        console.error("❌ Database connection failed:", error);
+    }
+    console.log(`🚀 Server running on port ${PORT}`);
+});
